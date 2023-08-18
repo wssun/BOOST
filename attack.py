@@ -24,9 +24,9 @@ class Attack:
 
         self.opt_freq = 1
         self.criterion = torch.nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.AdamW(model.parameters(),
+        self.optimizer = torch.optim.SGD(model.parameters(),
                                            lr=1e-2,
-                                           # momentum=0.9,
+                                           momentum=0.9,
                                            weight_decay=5e-4)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer,
                                                          step_size=50, gamma=0.1)
@@ -36,10 +36,6 @@ class Attack:
         self.poison_set = None
 
         if self.attack == 'badnets':
-            # self.optimizer = torch.optim.AdamW(model.parameters(),
-            #                                    lr=1e-4,
-            #                                    # momentum=0.9,
-            #                                    weight_decay=5e-4)
             pass
 
         elif self.attack == 'composite':
@@ -78,29 +74,6 @@ class Attack:
                                              momentum=0.9, weight_decay=5e-4)
             self.scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 self.optimizer, [100, 200, 300, 400], 0.1)
-        elif self.attack == 'inputaware':
-            self.lambda_div = 1
-            self.lambda_norm = 100
-            self.mask_density = 0.032
-            self.cross_rate = 0.1
-
-            self.criterion_div = torch.nn.MSELoss(reduction='none')
-
-            self.optimizer = torch.optim.SGD(model.parameters(), 1e-2,
-                                             momentum=0.9, weight_decay=5e-4)
-            self.scheduler = torch.optim.lr_scheduler.MultiStepLR(
-                self.optimizer, [100, 200, 300, 400], 0.1)
-
-            self.optim_mask = torch.optim.Adam(
-                self.backdoor.net_mask.parameters(),
-                1e-2, betas=(0.5, 0.9))
-            self.optim_genr = torch.optim.Adam(
-                self.backdoor.net_genr.parameters(),
-                1e-2, betas=(0.5, 0.9))
-            self.sched_mask = torch.optim.lr_scheduler.MultiStepLR(
-                self.optim_mask, [10, 20], 0.1)
-            self.sched_genr = torch.optim.lr_scheduler.MultiStepLR(
-                self.optim_genr, [200, 300, 400, 500], 0.1)
         elif self.attack == 'dynamic':
             self.optim_genr = torch.optim.Adam(
                 self.backdoor.net_genr.parameters())
@@ -119,17 +92,9 @@ class Attack:
             self.optim_disc_b = torch.optim.Adam(
                 self.backdoor.disc_b.parameters(),
                 2e-4, betas=(0.5, 0.999))
-
-            if self.attack == 'dfst_detox':
-                self.net_names = os.listdir('ckpt/dfst/')
-                self.optimizer = torch.optim.SGD(model.parameters(), lr=1e-2,
-                                                 momentum=0.9, weight_decay=5e-4)
-
         else:
             threat = 'dirty'
-
             if 'refool' in self.attack or self.attack == 'sig':
-                # self.poison_rate = 0.08
                 threat = 'clean'
 
             self.train_set = PoisonDataset_npy(dataset=self.train_set,
@@ -147,15 +112,8 @@ class Attack:
                                             backdoor=self.backdoor)
 
     def inject(self, inputs, labels):
-        # if self.attack == 'refool_smooth':
-        #     mean = [0.4914, 0.4822, 0.4465]
-        #     std = [0.2023, 0.1994, 0.2010]
-        #     normalize = transforms.Normalize(mean, std)
-        #
-        #     inputs = normalize(inputs)
         if self.attack == 'badnets':
             normalize = self.processing[0]
-
             num_bd = int(inputs.size(0) * self.poison_rate)
             # print(num_bd)
             inputs_bd = self.backdoor.inject(inputs[:num_bd])
@@ -164,8 +122,6 @@ class Attack:
             labels = torch.cat([labels_bd, labels[num_bd:]], dim=0)
             inputs = normalize(inputs)
         elif self.attack == 'wanet':
-            # normalize = self.processing[0]
-
             num_bd = int(inputs.size(0) * self.poison_rate)
             num_ns = int(num_bd * self.noise_ratio)
 
@@ -177,52 +133,11 @@ class Attack:
 
             inputs = self.transform(torch.cat([inputs_bd, inputs_ns,
                                                inputs[(num_bd + num_ns):]], dim=0))
-            # inputs = normalize(inputs)
             labels = torch.cat([labels_bd, labels[num_bd:]], dim=0)
-        elif self.attack == 'inputaware':
-            bs = inputs.shape[0]
-            num_bd = int(bs * self.poison_rate)
-            num_ns = int(bs * self.cross_rate)
-
-            size = bs // 2
-            inputs1 = inputs[:size]
-            inputs2 = inputs[size:]
-
-            inputs_bd, pattern1 = self.backdoor.inject(inputs1[:num_bd], True)
-
-            inputs_ns, pattern2 = self.backdoor.inject_noise(
-                inputs1[num_bd: num_bd + num_ns],
-                inputs2[num_bd: num_bd + num_ns], True)
-
-            labels_bd = torch.full((num_bd,), self.target).to(self.device)
-
-            inputs = torch.cat([inputs_bd, inputs_ns,
-                                inputs[(num_bd + num_ns):]], dim=0)
-            labels = torch.cat([labels_bd, labels[num_bd:]], dim=0)
-
-            div_input = self.criterion_div(inputs1[:num_bd],
-                                           inputs2[num_bd: num_bd + num_bd])
-            div_input = torch.mean(div_input, dim=(1, 2, 3))
-            div_input = torch.sqrt(div_input)
-
-            div_pattern = self.criterion_div(pattern1, pattern2)
-            div_pattern = torch.mean(div_pattern, dim=(1, 2, 3))
-            div_pattern = torch.sqrt(div_pattern)
-
-            loss_div = torch.mean(div_input / (div_pattern + EPSILON))
-            self.loss_div = loss_div * self.lambda_div
-        elif self.attack in ['dynamic', 'dfst', 'dfst_detox']:
+        elif self.attack in ['dynamic', 'dfst']:
             num_bd = int(inputs.size(0) * self.poison_rate)
             inputs_bd = self.backdoor.inject(inputs[:num_bd])
             labels_bd = torch.full((num_bd,), self.target).to(self.device)
-
-            if self.attack == 'dfst_detox':
-                name = np.random.choice(self.net_names)
-                net_feature = torch.load(f'ckpt/dfst/{name}').to(self.device)
-                x_detox = net_feature(inputs[num_bd: 2 * num_bd]).detach()
-                x_detox = self.processing[0](x_detox)
-                inputs[num_bd: 2 * num_bd] = x_detox
-
             inputs = torch.cat([inputs_bd, inputs[num_bd:]], dim=0)
             labels = torch.cat([labels_bd, labels[num_bd:]], dim=0)
 
@@ -254,10 +169,6 @@ class Attack_npy:
         self.poison_set = None
 
         if self.attack == 'badnets':
-            # self.optimizer = torch.optim.AdamW(model.parameters(),
-            #                                    lr=1e-4,
-            #                                    # momentum=0.9,
-            #                                    weight_decay=5e-4)
             pass
 
         elif self.attack == 'composite':
@@ -296,29 +207,6 @@ class Attack_npy:
                                              momentum=0.9, weight_decay=5e-4)
             self.scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 self.optimizer, [100, 200, 300, 400], 0.1)
-        elif self.attack == 'inputaware':
-            self.lambda_div = 1
-            self.lambda_norm = 100
-            self.mask_density = 0.032
-            self.cross_rate = 0.1
-
-            self.criterion_div = torch.nn.MSELoss(reduction='none')
-
-            self.optimizer = torch.optim.SGD(model.parameters(), 1e-2,
-                                             momentum=0.9, weight_decay=5e-4)
-            self.scheduler = torch.optim.lr_scheduler.MultiStepLR(
-                self.optimizer, [100, 200, 300, 400], 0.1)
-
-            self.optim_mask = torch.optim.Adam(
-                self.backdoor.net_mask.parameters(),
-                1e-2, betas=(0.5, 0.9))
-            self.optim_genr = torch.optim.Adam(
-                self.backdoor.net_genr.parameters(),
-                1e-2, betas=(0.5, 0.9))
-            self.sched_mask = torch.optim.lr_scheduler.MultiStepLR(
-                self.optim_mask, [10, 20], 0.1)
-            self.sched_genr = torch.optim.lr_scheduler.MultiStepLR(
-                self.optim_genr, [200, 300, 400, 500], 0.1)
         elif self.attack == 'dynamic':
             self.optim_genr = torch.optim.Adam(
                 self.backdoor.net_genr.parameters())
@@ -338,16 +226,10 @@ class Attack_npy:
                 self.backdoor.disc_b.parameters(),
                 2e-4, betas=(0.5, 0.999))
 
-            if self.attack == 'dfst_detox':
-                self.net_names = os.listdir('ckpt/dfst/')
-                self.optimizer = torch.optim.SGD(model.parameters(), lr=1e-2,
-                                                 momentum=0.9, weight_decay=5e-4)
-
         else:
             threat = 'dirty'
 
             if 'refool' in self.attack or self.attack == 'sig':
-                # self.poison_rate = 0.08
                 threat = 'clean'
 
             self.train_set = PoisonDataset_npy(dataset=self.train_set,
@@ -366,25 +248,7 @@ class Attack_npy:
 
 
     def inject(self, inputs, labels):
-        # if 'refool' in self.attack:
-        #     mean = [0.4914, 0.4822, 0.4465]
-        #     std = [0.2023, 0.1994, 0.2010]
-        #     normalize = transforms.Normalize(mean, std)
-        #
-        #     inputs = (normalize(inputs[0]), inputs[1])
-
-        if self.attack in ['dynamic', 'dfst', 'dfst_detox']:
-            num_bd = int(inputs.size(0) * self.poison_rate)
-            inputs_bd = self.backdoor.inject(inputs[:num_bd])
-            labels_bd = torch.full((num_bd,), self.target).to(self.device)
-
-            poison = np.ones(num_bd, dtype=int)
-            clean = np.zeros(inputs[num_bd:].size(0), dtype=int)
-
-            inputs = (torch.cat([inputs_bd, inputs[num_bd:]], dim=0), np.concatenate((poison, clean), axis=0))
-            labels = torch.cat([labels_bd, labels[num_bd:]], dim=0)
-
-        elif self.attack == "badnets":
+        if self.attack == "badnets":
             normalize = self.processing[0]
 
             num_bd = int(inputs.size(0) * self.poison_rate)
@@ -396,6 +260,17 @@ class Attack_npy:
 
             inputs = (
             normalize(torch.cat([inputs_bd, inputs[num_bd:]], dim=0)), np.concatenate((poison, clean), axis=0))
+            labels = torch.cat([labels_bd, labels[num_bd:]], dim=0)
+
+        elif self.attack in ['dynamic', 'dfst']:
+            num_bd = int(inputs.size(0) * self.poison_rate)
+            inputs_bd = self.backdoor.inject(inputs[:num_bd])
+            labels_bd = torch.full((num_bd,), self.target).to(self.device)
+
+            poison = np.ones(num_bd, dtype=int)
+            clean = np.zeros(inputs[num_bd:].size(0), dtype=int)
+
+            inputs = (torch.cat([inputs_bd, inputs[num_bd:]], dim=0), np.concatenate((poison, clean), axis=0))
             labels = torch.cat([labels_bd, labels[num_bd:]], dim=0)
 
         elif self.attack == 'wanet':
@@ -416,42 +291,6 @@ class Attack_npy:
             inputs = self.transform(torch.cat([inputs_bd, inputs_ns,
                                                inputs[(num_bd + num_ns):]], dim=0))
             inputs = (inputs, np.concatenate((poison, clean), axis=0))
-            # inputs = (normalize(inputs), np.concatenate((poison, clean), axis=0))
             labels = torch.cat([labels_bd, labels[num_bd:]], dim=0)
-
-        elif self.attack == 'inputaware':
-            bs = inputs.shape[0]
-            num_bd = int(bs * self.poison_rate)
-            num_ns = int(bs * self.cross_rate)
-
-            poison = np.ones(num_bd, dtype=int)
-            clean = np.zeros(inputs[num_bd:].size(0), dtype=int)
-
-            size = bs // 2
-            inputs1 = inputs[:size]
-            inputs2 = inputs[size:]
-
-            inputs_bd, pattern1 = self.backdoor.inject(inputs1[:num_bd], True)
-
-            inputs_ns, pattern2 = self.backdoor.inject_noise(
-                inputs1[num_bd: num_bd + num_ns],
-                inputs2[num_bd: num_bd + num_ns], True)
-
-            labels_bd = torch.full((num_bd,), self.target).to(self.device)
-
-            inputs = (torch.cat([inputs_bd, inputs_ns, inputs[(num_bd + num_ns):]], dim=0), np.concatenate((poison, clean), axis=0))
-            labels = torch.cat([labels_bd, labels[num_bd:]], dim=0)
-
-            div_input = self.criterion_div(inputs1[:num_bd],
-                                           inputs2[num_bd: num_bd + num_bd])
-            div_input = torch.mean(div_input, dim=(1, 2, 3))
-            div_input = torch.sqrt(div_input)
-
-            div_pattern = self.criterion_div(pattern1, pattern2)
-            div_pattern = torch.mean(div_pattern, dim=(1, 2, 3))
-            div_pattern = torch.sqrt(div_pattern)
-
-            loss_div = torch.mean(div_input / (div_pattern + EPSILON))
-            self.loss_div = loss_div * self.lambda_div
             
         return inputs, labels
