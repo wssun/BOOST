@@ -153,22 +153,10 @@ def get_backdoor(attack, shape, normalize=None, device=None, args=None):
         else:
             torch.save(backdoor.noise_grid.cpu(), noise_path)
             torch.save(backdoor.identity_grid.cpu(), identity_path)
-    elif attack == 'invisible':
-        backdoor = Invisible()
-    elif attack in ['blend', 'sig', 'polygon']:
+    elif attack in ['blend', 'sig']:
         backdoor = Other(attack, device=None)
-    elif attack == 'filter':
-        backdoor = Filter()
     elif attack == 'badnets':
         backdoor = Badnets(normalize, device=None)
-    elif attack == 'inputaware':
-        backdoor = InputAware(normalize, device=device)
-        mask_path = f'{base_path}_inputaware_mask.pt'
-        genr_path = f'{base_path}_inputaware_pattern.pt'
-        if os.path.exists(mask_path) & os.path.exists(genr_path):
-            print("inputaware.pt exsit!")
-            backdoor.net_mask = torch.load(mask_path).to(device)
-            backdoor.net_genr = torch.load(genr_path).to(device)
     elif attack == 'dynamic':
         backdoor = Dynamic(normalize, device=device)
         genr_path = f'{base_path}_dynamic_pattern.pt'
