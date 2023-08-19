@@ -124,7 +124,6 @@ def eval_acc(model, loader, backdoor=None):
         for step, (x_batch, y_batch) in enumerate(loader):
             x_batch, y_batch = x_batch.to(DEVICE), y_batch.to(DEVICE)
 
-            # x_batch = filter(x_batch)
             x_batch = x_batch.cuda()
 
             if backdoor is not None:
@@ -159,11 +158,6 @@ def adv(args):
 
     train_loader = DataLoader(dataset=attack.train_set,
                               batch_size=args.batch_size, shuffle=True)
-    # acc = eval_acc(model, test_loader)
-    # print("finish!")
-    # asr = eval_acc(model, poison_loader)
-    # print('ori_asr: {:.4f}\n'.format(asr) + 'ori_acc: {:.4f}\n'.format(acc))
-
 
     if args.attack == 'dfst':
         pass
@@ -174,7 +168,7 @@ def adv(args):
     cnt_flip = 0
     cnt_flipnone = 0
     for step, (x_batch, y_batch) in enumerate(train_loader):
-        if args.attack in ['badnets', 'dfst', 'dynamic', 'inputaware', 'wanet']:
+        if args.attack in ['badnets', 'dfst', 'dynamic', 'wanet']:
             x_batch, y_batch = x_batch.to(DEVICE), y_batch.to(DEVICE)
             x_batch, y_batch = attack.inject(x_batch, y_batch)
             x_batch_true = copy.copy(x_batch)
@@ -229,11 +223,6 @@ def adv(args):
                     flip.append((x_batch_true[0][idx].cpu().numpy(), y_batch_true[idx].cpu().numpy(), x_batch_true[1][idx]))
                     if x_batch[1][idx] == 1: cnt_flip += 1
 
-        '''if step % 10 == 0:
-            sys.stdout.write('step: {:4},'.format(step) + 'acc: {:.4f},'.format(acc) + 'adv: {:.4f}\n'.format(adv))
-            sys.stdout.flush()'''
-
-        # if step > 5: break
 
     time_end = time.time()
     sys.stdout.write('Finish adv attack! - {:5.2f}s,\n'.format(time_end - time_start))
@@ -255,7 +244,6 @@ def adv(args):
 
 def poison(args):
     model = get_model(args).to(DEVICE)
-    # model = torch.nn.DataParallel(model)
 
     attack = Attack_npy(model, args, device=DEVICE)
 
@@ -273,10 +261,6 @@ def poison(args):
                                batch_size=args.batch_size)
     test_loader = DataLoader(dataset=attack.test_set,
                              batch_size=args.batch_size)
-    # acc = eval_acc(model, test_loader)
-    # print("finish!")
-    # asr = eval_acc(model, poison_loader)
-    # print('ori_asr: {:.4f}\n'.format(asr) + 'ori_acc: {:.4f}\n'.format(acc))
 
     if args.attack == 'dfst':
         pass
@@ -324,11 +308,7 @@ def poison(args):
         df.to_csv("./logs/{} with {}.csv".format(args.model_name, args.poison_rate), index=False, encoding="utf-8", header=True)
 
         save_path = f'ckpt/{args.model_name}_init.pt'
-        '''if epoch > 10 and acc - asr > best_acc - best_asr:
-            best_acc = acc
-            best_asr = asr
-            print(f'---BEST ACC: {best_acc:.4f}, ASR: {best_asr:.4f}---')
-            torch.save(model, save_path)'''
+
         if epoch > 10 and acc > best_acc:
             best_acc = acc
             best_asr = asr
@@ -531,7 +511,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--seed', type=int, default=1024, help='seed index')
     parser.add_argument('--batch_size', type=int, default=100, help='attack size')
-    parser.add_argument('--epochs', type=int, default=150, help='number of epochs')
+    parser.add_argument('--epochs', type=int, default=100, help='number of epochs')
     parser.add_argument('--target', type=int, default=0, help='target label')
 
     parser.add_argument('--poison_rate', type=float, default=0.1, help='poisoning rate')
