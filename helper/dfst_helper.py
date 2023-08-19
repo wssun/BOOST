@@ -1,7 +1,5 @@
 import sys
 import torch
-# import sys
-# sys.path.append(r"C:\Users\gyf99\Desktop\NJU\reproduction\DFST\backdoor-main\cv")
 from dataset import ImageDataset
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
