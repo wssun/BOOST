@@ -173,4 +173,4 @@ dependencies:
       - kornia==0.6.11
       - pilgram==1.2.1
       - transformers==4.27.4
-prefix: C:\Users\gyf99\miniconda3\envs\coll
+prefix: C:\Users\xxx\miniconda3\envs\coll
