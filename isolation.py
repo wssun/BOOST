@@ -237,16 +237,12 @@ def select(args, model_name):
 
 def main():
     best = 0
-    best_rate = 1
-    best_num = 50000
-    for idx in range(20):
-        # 批量
+    for idx in range(args.epochs):
         name = args.attack + "_" + str(idx)
         total, flip, poi_num = select(args, name)
         flip_unex = com_unex(flip)
         total_unex = com_unex(total)
         diff = total_unex/len(total) - flip_unex/len(flip)
-        rate = poi_num/len(flip)
         if diff > best:
             best = diff
             best_name1 = name
@@ -263,9 +259,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--phase', default='poison', help='phase of framework')
     parser.add_argument('--dataset', default='cifar10', help='dataset')
-    parser.add_argument('--network', default='resnet18', help='network structure')
 
-    parser.add_argument('--attack', default='refool_smooth', help='attack type')
+    parser.add_argument('--attack', default='dfst', help='attack type')
     parser.add_argument('--threat', default='universal', help='threat model')
     parser.add_argument('--pair', default='1-0', help='label pair')
 
@@ -274,9 +269,8 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=1024, help='seed index')
     parser.add_argument('--batch_size', type=int, default=128, help='attack size')
     parser.add_argument('--epochs', type=int, default=20, help='number of epochs')
-    parser.add_argument('--target', type=int, default=0, help='target label')
 
-    parser.add_argument('--poison_rate', type=float, default=0.1, help='poisoning rate')
+
 
     args = parser.parse_args()
 
