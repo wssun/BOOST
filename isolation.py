@@ -250,16 +250,8 @@ def main():
         if diff > best:
             best = diff
             best_name1 = name
-        print(name, " : ", poi_num, len(flip), rate, diff)
-        # if poi_num < best_num:
-        #     best_num = poi_num
-        #     best_name2 = name
-        # if rate < best_rate:
-        #     best_rate = rate
-        #     best_name3 = name
     print("best: ", best_name1, best)
-    # print(best_name2, best_num)
-    # print(best_name3, best_rate)
+
 
 
 if __name__ == '__main__':
