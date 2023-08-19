@@ -20,44 +20,94 @@ This repo provides the code for reproducing the experiments in Backdooring Neura
 │    ├─── framework.png
 │    ├─── data.png
 ├─── models
-├─── src
-│    ├─── CodeBERT
-│    │    ├─── evaluate_attack
-│    │    │    ├─── evaluate_attack.py
-│    │    │    ├─── mrr_poisoned_model.py
-│    │    ├─── mrr.py
-│    │    ├─── run_classifier.py
-│    │    ├─── utils.py
-│    ├─── CodeT5
-│    │    ├─── evaluate_attack
-│    │    │    ├─── evaluate_attack.py
-│    │    │    ├─── mrr_poisoned_model.py
-│    │    ├─── _utils.py
-│    │    ├─── configs.py
-│    │    ├─── models.py
-│    │    ├─── run_search.py
-│    │    ├─── utils.py
-│    ├─── stealthiness
-│    │    ├─── defense
-│    │    │    ├───activation_clustering.py
-│    │    │    ├───spectral_signature.py
-├─── utils
-│    ├─── results
-│    │    ├─── matching_pair
-│    │    ├─── selecting_trigger
-│    ├─── vocab_frequency.py
-│    ├─── select_trigger.py
+│    ├─── custom_modules.py
+│    ├─── cyclegan.py
+│    ├─── densenet.py
+│    ├─── generator.py
+│    ├─── hiddennet.py
+│    ├─── inception.py
+│    ├─── preact_resnet.py
+│    ├─── resnet.py
+│    ├─── unet.py
+│    ├─── vgg.py
+├─── helper
+│    ├─── augmentation.py
+│    ├─── composite.py
+│    ├─── dfst_helper.py
+├─── backdoors
+│    ├─── badnets.py
+│    ├─── dfst.py
+│    ├─── dynamic.py
+│    ├─── other.py
+│    ├─── refool.py
+│    ├─── wanet.py
+├─── ckpt
+├─── logs
+├─── iso_data
+├─── environment.yml
 ├─── README.md
-├─── trigger-injected samples.pdf
+├─── LICENSE
+├─── attack.py
+├─── base_attack.py
+├─── config.py
+├─── dataset.py
+├─── evaluation.py
+├─── inversion.py
+├─── isolation.py
+├─── pgd.py
+├─── retraining.py
+├─── util.py
 ```
 
+## Runtime Environment
+We provide the yml file for the runtime environment as a reference.
+```shell
+conda env create -f environment.yml 
+```
 ## Data Statistics
 Data statistics of the dataset are shown in the below table:
 
-|       | Python  |  Java   |
-| ----- |:-------:|:-------:|
-| Train | 412,178 | 454,451 |
-| Valid | 23,107  | 15,328  |
-| Test  | 22,176  | 26,909  |
+|       | CIFAR-10 |  SVHN  | GTSRB  |
+| ----- |:--------:|:------:|--------|
+| Train |  40,000  | 73,257 | 39,200 |
+| Test  |  10,000  | 26,032 | 12,630 |
 
-## Backdoor attack
+## Backdoor defense
+[//]: # (Download the GTSRB data from the following . Then, place it in the predefined path of the project &#40;\data&#41;.)
+
+- Model Training
+```shell
+python evluation.py \
+--datadir ./data/cifar \
+--dataset cifar10 \
+--network resnet18 \
+--attack dfst \
+--gpu 0 \
+--epochs 20 \
+--target 0 \
+--poison_rate 0.1 
+```
+
+- Selecting optimal isolation data
+```shell
+python isolation.py \
+--datadir ./data/cifar \
+--dataset cifar10 \
+--attack dfst \
+--gpu 0 \
+--epochs 20
+```
+
+- Retraining the clean model
+The parameter 'model_name' is obtained from the results in 'isolation.py'. (We provide our best result 'dfts_10.pt' at https://drive.google.com/file/d/1UzFZkWjlrUHuRTC41K9v7FiabE2r8iuM/view?usp=sharing obtained in isolation.py for testing.)
+```shell
+python retraining.py \
+--model_name dfst_10 \
+--datadir ./data/cifar \
+--dataset cifar10 \
+--attack dfst \
+--gpu 0 \
+--epochs 100 \
+--poison_rate 0.1 \
+--FT_epochs 100
+```
