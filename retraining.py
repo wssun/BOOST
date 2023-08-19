@@ -64,7 +64,7 @@ _num = {
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
-dataset_iso_model = r"./ckpt/PR0.1"
+dataset_iso_model = r"./ckpt"
 
 def get_norm(dataset):
     assert dataset in _dataset_name, _dataset_name
