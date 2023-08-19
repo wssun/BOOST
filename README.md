@@ -99,10 +99,10 @@ python isolation.py \
 ```
 
 - Retraining the clean model
-The parameter 'model_name' is obtained from the results in 'isolation.py'. (We provide our best result 'dfts_10.pt' at https://drive.google.com/file/d/1UzFZkWjlrUHuRTC41K9v7FiabE2r8iuM/view?usp=sharing obtained in isolation.py for testing.)
+The parameter 'model_name' is obtained from the results in 'isolation.py'.
 ```shell
 python retraining.py \
---model_name dfst_10 \
+--model_name  \
 --datadir ./data/cifar \
 --dataset cifar10 \
 --attack dfst \
