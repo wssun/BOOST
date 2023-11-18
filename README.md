@@ -1,7 +1,7 @@
-# Backdooring Neural Code Search
-This repo provides the code for reproducing the experiments in Backdooring Neural Code Search(BADCODE).
+# Backdoor-resilient Training
+This repo provides the code for reproducing the experiments in Backdoor-resilient Training(BOOST).
 
-## An Overview to BADCODE
+## An Overview to BOOST
 ![framework](figures/framework.png)
 
 ## Figure of Data (including perturbed, poisoned)
